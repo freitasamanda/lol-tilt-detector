@@ -1,0 +1,22 @@
+# ==============================================================================
+# DEPENDÊNCIAS DO PROJETO - DETECTOR DE TILT (LEAGUE OF LEGENDS)
+# ==============================================================================
+
+# Requisições HTTP e gerenciamento de variáveis de ambiente (.env)
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# Manipulação de dados e armazenamento colunar leve (Parquet)
+
+pandas>=2.1.0
+numpy>=1.26.0
+pyarrow>=14.0.0
+
+# Machine Learning, métricas e explicabilidade
+scikit-learn>=1.3.0
+lightgbm>=4.1.0
+
+# Interface Web Interativa e visualização de dados
+
+streamlit>=1.30.0
+plotly>=5.18.0

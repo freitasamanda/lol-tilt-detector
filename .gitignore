@@ -1,0 +1,39 @@
+# ==========================================
+# 1. SEGURANÇA E CREDENCIAIS (NUNCA SUBIR!)
+# ==========================================
+.env
+.env.local
+*.key
+.streamlit/secrets.toml
+
+# ==========================================
+# 2. DADOS PRIVADOS E BANCOS LOCAIS
+# ==========================================
+# Bloqueia dados brutos e processados com PUUIDs reais (Conformidade Riot API)
+data/raw/*
+data/processed/*
+*.db
+*.sqlite
+*.sqlite3
+
+# Libera apenas a pasta e a amostra anonimizada para o Modo Demo
+!data/sample_matches.parquet
+
+# ==========================================
+# 3. MODELOS SERIALIZADOS (BINÁRIOS)
+# ==========================================
+models/*.joblib
+models/*.pkl
+
+# ==========================================
+# 4. AMBIENTE PYTHON E SISTEMA OPERACIONAL
+# ==========================================
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db

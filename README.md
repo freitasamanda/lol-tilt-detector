@@ -1,6 +1,8 @@
-# lol-tilt-detector
+# Detector de Tilts no League of Legends
+## Acesse o app aqui! [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://SEU-LINK-DO-STREAMLIT.streamlit.app)
 
 > **Um detector para quando você está tiltado, para te lembrar de fazer uma pausa e sentir o cheiro das flores.**
+
 > **Saindo do Modo Tilt para o Modo Chill:** Um sistema de Ciência de Dados e Machine Learning que identifica sinais precoces de fadiga cognitiva e frustração (*tilt*) em sessões ranqueadas de *League of Legends* — e convida o jogador a fazer uma pausa na natureza antes que a sequência de derrotas piore.
 
 Este projeto prevê a probabilidade de o jogador de League of Legends estar 'tiltado', isto é, extremamente frustrado e irritado após uma sequência de jogos ruins, sugerindo uma pausa com uma interface agradável e calma.

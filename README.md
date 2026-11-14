@@ -19,7 +19,7 @@ Este projeto resolve esse problema e ajuda o jogador a relaxar com uma arquitetu
 3. **Modelagem & Validação Agrupada (`GroupKFold`):** Treina um classificador **LightGBM** regularizado garantindo que partidas de um mesmo invocador nunca vazem entre treino e validação.
 4. **Produto Interativo em Estética 8-Bit:** Quando o risco de *tilt* ultrapassa o limiar configurado, o webapp transita automaticamente de *Summoner's Rift* para uma floresta relaxante em pixel art com áudio ambiente, sugerindo uma pausa estratégica.
 
-## 🚀 Como usar
+## 🚀 Como rodar localmente
 Você pode usar o Demo Mode para testar ou utilizar o seu RiotID para que o detector de tilts monitore ao vivo suas seções de jogatinas.
 
 Você vai precisar instalar o [Git](https://git-scm.com), o [Python](https://www.python.org), e adquirir uma Riot API Key no [Riot Developer Portal](https://developer.riotgames.com).

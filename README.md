@@ -25,7 +25,7 @@ Você vai precisar instalar o [Git](https://git-scm.com), o [Python](https://www
 Após isso, clone o repositório, utilizando o seguinte código no seu terminal: 
 
 ```
-git clone [https://github.com/SEU-USUARIO/lol-tilt-detector.git](https://github.com/SEU-USUARIO/>lol-tilt-detector.git)
+git clone https://github.com/freitasamanda/lol-tilt-detector
 ```
 Entre na pasta do repositório com
 ```

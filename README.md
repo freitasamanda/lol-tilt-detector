@@ -1,6 +1,7 @@
 # lol-tilt-detector
-A detector for when you're tilted, to remind you to stop and smell the flowers.
-Um detector para quando você está tiltado, para te lembrar de fazer uma pausa e sentir o cheiro das flores.
+
+> **Um detector para quando você está tiltado, para te lembrar de fazer uma pausa e sentir o cheiro das flores.**
+> **Saindo do Modo Tilt para o Modo Chill:** Um sistema de Ciência de Dados e Machine Learning que identifica sinais precoces de fadiga cognitiva e frustração (*tilt*) em sessões ranqueadas de *League of Legends* — e convida o jogador a fazer uma pausa na natureza antes que a sequência de derrotas piore.
 
 Este projeto prevê a probabilidade de o jogador de League of Legends estar 'tiltado', isto é, extremamente frustrado e irritado após uma sequência de jogos ruins, sugerindo uma pausa com uma interface agradável e calma.
 
@@ -8,9 +9,49 @@ O modelo funciona com base em engenharia de atributos temporais e conecta-se com
 
 > Este projeto não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games ou de qualquer pessoa oficialmente envolvida na produção ou gerenciamento de propriedades da Riot Games.
 
-## Como usar
-- Demo Mode: teste com dados de exemplo
-- Analisar minha conta: insira sua API Key da Riot Games e teste com sua própria conta.
+> Este projeto segue princípios de privaticade com Anonimização (Todos os identificadores (puuid e match_id) presentes na amostra pública passam por hash criptográfico SHA-256 antes de serem versionados) e Segurança de Chaves (Chaves inseridas na interface web são mantidas estritamente em memória durante a sessão e nunca são gravadas em disco).
+
+Este projeto resolve esse problema e ajuda o jogador a relaxar com uma arquitetura de Data Science de ponta a ponta:
+1. **Engenharia de Dados & Coleta em Grafo (BFS):** Extrai telemetria detalhada via Riot API (`Account-v1`, `League-v4` e `Match-v5`) com controle resiliente de *Rate Limit* (`HTTP 429`).
+2. **Engenharia de Atributos Temporais sem *Data Leakage*:** Segmenta o histórico em sessões contínuas ($\Delta t \le 15\text{ min}$), calcula *baselines* individuais expansivas e sintetiza janelas móveis ($t-3, t-2, t-1 \rightarrow t$).
+3. **Modelagem & Validação Agrupada (`GroupKFold`):** Treina um classificador **LightGBM** regularizado garantindo que partidas de um mesmo invocador nunca vazem entre treino e validação.
+4. **Produto Interativo em Estética 8-Bit:** Quando o risco de *tilt* ultrapassa o limiar configurado, o webapp transita automaticamente de *Summoner's Rift* para uma floresta relaxante em pixel art com áudio ambiente, sugerindo uma pausa estratégica.
+
+## 🚀 Como usar
+Você pode usar o Demo Mode para testar ou utilizar o seu RiotID para que o detector de tilts monitore ao vivo suas seções de jogatinas.
+
+Você vai precisar instalar o [Git](https://git-scm.com), o [Python](https://www.python.org), e adquirir uma Riot API Key no [Riot Developer Portal](https://developer.riotgames.com).
+
+Após isso, clone o repositório, utilizando o seguinte código no seu terminal: 
+
+```
+git clone [https://github.com/SEU-USUARIO/lol-tilt-detector.git](https://github.com/SEU-USUARIO/>lol-tilt-detector.git)
+```
+Entre na pasta do repositório com
+```
+cd lol-tilt-detector
+```
+Ative o ambiente virtual em python
+ ```
+ python -m venv .venv
+ ```
+No Windows, utilize:
+```
+.\.venv\Scripts\Activate.ps1
+```
+No Linux, utilize:
+```
+source .venv/bin/activate
+```
+Instale os pacotes necessários com:
+```
+pip install -r requirements.txt
+```
+Execute o Webapp com Streamlit
+```
+streamlit run app.py
+```
+
 
 ## Arquitetura do pipeline
 ```mermaid

@@ -3,9 +3,14 @@ app.py
 ======
 Webapp Interativo 8-Bit: Detector de Tilt no League of Legends.
 
-Configurado para operação com Personal API Key (via st.secrets ou .env),
-cache de consultas ao vivo (TTL 10 min) para proteção de Rate Limit e
-conformidade visual com os termos de desenvolvedor da Riot Games.
+Fluxo de Interface:
+- Landing Page ('home'): Foco direto na consulta ao vivo via Riot ID (Nick#TAG)
+  utilizando a Personal API Key, acompanhada dos botões 8-bit para o Demo Mode,
+  Simulação de Tilt e Análises 8-Bit.
+- Modo Chill ('is_tilted=True'): Tela de floresta relaxante em pixel art com
+  som ambiente discreto ('assets/forest.wav').
+- Demo Mode ('demo'): Exploração de invocadores da amostra anonimizada.
+- Análises 8-Bit ('analytics'): Gráficos comportamentais e explicabilidade LightGBM.
 """
 
 import base64
@@ -52,11 +57,11 @@ def get_riot_api_key() -> str:
     try:
         secret_key = st.secrets.get("RIOT_API_KEY", "")
         if secret_key:
-            return secret_key
+            return secret_key.strip()
     except Exception:
         pass
 
-    env_key = os.getenv("RIOT_API_KEY", "")
+    env_key = os.getenv("RIOT_API_KEY", "").strip()
     return "" if "sua-chave" in env_key else env_key
 
 
@@ -169,8 +174,8 @@ def apply_8bit_theme(is_tilted: bool):
         /* Botões em estilo Arcade / 8-Bit */
         .stButton > button {{
             font-family: 'Press Start 2P', monospace !important;
-            font-size: 0.68rem !important;
-            line-height: 1.4 !important;
+            font-size: 0.66rem !important;
+            line-height: 1.45 !important;
             color: #111827 !important;
             background-color: #ffd166 !important;
             border: 3px solid #000000 !important;
@@ -237,20 +242,54 @@ def apply_8bit_theme(is_tilted: bool):
             opacity: 0.85;
         }}
 
-        /* Aviso legal discreto da Riot Games no rodapé */
-        .riot-disclaimer {{
+        /* Créditos e aviso legal da Riot Games no rodapé */
+        .footer-box {{
             max-width: 650px;
-            margin: 35px auto 0 auto;
-            padding: 8px 12px;
-            background-color: rgba(10, 15, 25, 0.78);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            font-family: sans-serif;
-            font-size: 0.72rem;
-            color: #cbd5e1;
+            margin: 32px auto 0 auto;
+            padding: 12px 16px;
+            background-color: rgba(10, 15, 25, 0.84);
+            border: 2px solid rgba(255, 255, 255, 0.2);
             text-align: center;
+        }}
+        .creator-credit {{
+            font-family: 'Press Start 2P', monospace;
+            font-size: 0.68rem;
+            color: #f8fafc;
+            margin-bottom: 8px;
+        }}
+        .creator-credit a {{
+            color: #ffd166;
+            text-decoration: none;
+            border-bottom: 2px solid #ffd166;
+        }}
+        .creator-credit a:hover {{
+            color: #ffe194;
+        }}
+        .riot-disclaimer {{
+            font-family: sans-serif;
+            font-size: 0.70rem;
+            color: #94a3b8;
             line-height: 1.35;
         }}
         </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_footer():
+    """Renderiza a assinatura da autora com link e o disclaimer legal da Riot Games."""
+    st.markdown(
+        """
+        <div class="footer-box">
+            <div class="creator-credit">
+                Created by: <a href="https://freitasamanda.github.io" target="_blank">Amanda Freitas</a>
+            </div>
+            <div class="riot-disclaimer">
+                Detector de Tilts não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games
+                ou de qualquer pessoa oficialmente envolvida na produção ou gerenciamento das propriedades da Riot Games.
+            </div>
+        </div>
         """,
         unsafe_allow_html=True,
     )
@@ -371,7 +410,7 @@ def analyze_player_session(df_player_raw: pd.DataFrame, artifact: dict):
 if "is_tilted" not in st.session_state:
     st.session_state.is_tilted = False
 if "current_view" not in st.session_state:
-    st.session_state.current_view = "home"  # 'home' | 'live' | 'analytics'
+    st.session_state.current_view = "home"  # 'home' | 'demo' | 'analytics'
 if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 
@@ -420,8 +459,10 @@ if st.session_state.is_tilted:
         st.session_state.current_view = "home"
         st.rerun()
 
+    render_footer()
+
 # ==============================================================================
-# ESTADO 2: TELA INICIAL (SUMMONER'S RIFT 8-BIT + GRADE DE BOTÕES)
+# ESTADO 2: LANDING PAGE (FOCO DIRETO NO RIOT ID + BOTÕES 8-BIT)
 # ==============================================================================
 elif st.session_state.current_view == "home":
     st.markdown(
@@ -438,89 +479,7 @@ elif st.session_state.current_view == "home":
 
     _, col_mid, _ = st.columns([1.5, 3, 1.5])
     with col_mid:
-        if not df_sample_feat.empty:
-            players_available = df_sample_feat["puuid"].unique().tolist()
-            st.markdown(
-                '<span class="pixel-field-label">👤 Selecione um Invocador (Amostra Anonimizada):</span>',
-                unsafe_allow_html=True,
-            )
-            selected_player = st.selectbox(
-                "Selecione um Invocador (Amostra Anonimizada):",
-                players_available,
-                label_visibility="collapsed",
-            )
-
-            # Linha 1 de botões 8-bit
-            b1, b2 = st.columns(2)
-            if b1.button("🔍 Verificar Estado Mental", use_container_width=True):
-                df_p = df_sample_raw[df_sample_raw["puuid"] == selected_player].sort_values("game_start_ms")
-                res = analyze_player_session(df_p, artifact)
-                st.session_state.analysis_result = res
-                st.session_state.is_tilted = bool(res and res["prob_loss"] >= threshold)
-                st.rerun()
-
-            if b2.button("🌲 Simular Alerta de Tilt", use_container_width=True):
-                st.session_state.is_tilted = True
-                st.session_state.analysis_result = {
-                    "prob_loss": 0.78,
-                    "latest_features": {
-                        "losses_last_3": 3,
-                        "avg_rest_min_last_3": 0.8,
-                        "game_index_in_session": 4,
-                    },
-                }
-                st.rerun()
-
-        # Linha 2 de botões 8-bit
-        b3, b4 = st.columns(2)
-        if b3.button("🔴 Consulta Ao Vivo", use_container_width=True):
-            st.session_state.current_view = "live"
-            st.rerun()
-
-        if b4.button("📊 Análises 8-Bit", use_container_width=True):
-            st.session_state.current_view = "analytics"
-            st.rerun()
-
-    if st.session_state.analysis_result:
-        res = st.session_state.analysis_result
-        feat = res["latest_features"]
-        prob = res["prob_loss"]
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        _, c1, c2, c3, c4, _ = st.columns([1, 2, 2, 2, 2, 1])
-        c1.metric("Risco Previsto", f"{prob:.1%}")
-        c2.metric("Status Mental", "ESTÁVEL ✅")
-        c3.metric("Derrotas (Últimos 3)", f"{int(feat['losses_last_3'])} / 3")
-        c4.metric("Descanso Médio", f"{feat['avg_rest_min_last_3']:.1f} min")
-
-    st.markdown(
-        """
-        <div class="riot-disclaimer">
-            Detector de Tilts não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games
-            ou de qualquer pessoa oficialmente envolvida na produção ou gerenciamento das propriedades da Riot Games.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-# ==============================================================================
-# ESTADO 3: CONSULTA AO VIVO VIA RIOT API (USANDO PERSONAL API KEY)
-# ==============================================================================
-elif st.session_state.current_view == "live":
-    st.markdown(
-        """
-        <div class="rpg-dialog-box">
-            <div class="pixel-title" style="font-size: 1.05rem;">🔴 CONSULTA AO VIVO (RIOT API)</div>
-            <div class="pixel-text">
-                Digite seu Riot ID (ex: Nick#BR1) para avaliar sua sessão ranqueada recente em tempo real.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    _, col_live, _ = st.columns([1.5, 3, 1.5])
-    with col_live:
+        # Entrada direta do Riot ID logo na Landing Page
         c_reg, c_id = st.columns([1, 2])
         with c_reg:
             st.markdown('<span class="pixel-field-label">🌎 Região:</span>', unsafe_allow_html=True)
@@ -530,17 +489,17 @@ elif st.session_state.current_view == "live":
                 label_visibility="collapsed",
             )
         with c_id:
-            st.markdown('<span class="pixel-field-label">🎮 Riot ID (Nick#TAG):</span>', unsafe_allow_html=True)
+            st.markdown('<span class="pixel-field-label">🎮 Digite seu Riot ID:</span>', unsafe_allow_html=True)
             riot_id_query = st.text_input(
                 "Riot ID",
                 placeholder="Ex: Nick#BR1",
                 label_visibility="collapsed",
             )
 
-        btn_l1, btn_l2 = st.columns(2)
-        if btn_l1.button("🔍 Analisar Agora", use_container_width=True):
+        # Botão principal de ação
+        if st.button("🔍 Verificar Estado Mental", use_container_width=True):
             if "#" not in riot_id_query:
-                st.warning("⚠️ Formato inválido! Use 'Nome#TAG'.")
+                st.warning("⚠️ Formato inválido! Digite seu Riot ID com a tag (ex: Nick#BR1).")
             else:
                 game_name, tag_line = [p.strip() for p in riot_id_query.split("#", 1)]
                 with st.spinner(f"Consultando partidas recentes de {game_name}#{tag_line}..."):
@@ -563,13 +522,101 @@ elif st.session_state.current_view == "live":
                                 if st.session_state.is_tilted:
                                     st.rerun()
                                 else:
-                                    st.success(f"✅ Estado Estável! Risco de derrota previsto: {res['prob_loss']:.1%}")
+                                    st.rerun()
                     except Exception as e:
                         st.error(f"Erro na consulta: {e}")
 
-        if btn_l2.button("⬅️ Voltar ao Início", use_container_width=True):
-            st.session_state.current_view = "home"
+        # Botões secundários 8-bit abaixo da consulta principal
+        b_demo, b_sim, b_ana = st.columns(3)
+        if b_demo.button("🎮 Entrar no Demo Mode", use_container_width=True):
+            st.session_state.current_view = "demo"
             st.rerun()
+
+        if b_sim.button("🌲 Simular Tilt", use_container_width=True):
+            st.session_state.is_tilted = True
+            st.session_state.analysis_result = {
+                "prob_loss": 0.78,
+                "latest_features": {
+                    "losses_last_3": 3,
+                    "avg_rest_min_last_3": 0.8,
+                    "game_index_in_session": 4,
+                },
+            }
+            st.rerun()
+
+        if b_ana.button("📊 Análises 8-Bit", use_container_width=True):
+            st.session_state.current_view = "analytics"
+            st.rerun()
+
+    if st.session_state.analysis_result:
+        res = st.session_state.analysis_result
+        feat = res["latest_features"]
+        prob = res["prob_loss"]
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        _, c1, c2, c3, c4, _ = st.columns([1, 2, 2, 2, 2, 1])
+        c1.metric("Risco Previsto", f"{prob:.1%}")
+        c2.metric("Status Mental", "ESTÁVEL ✅")
+        c3.metric("Derrotas (Últimos 3)", f"{int(feat['losses_last_3'])} / 3")
+        c4.metric("Descanso Médio", f"{feat['avg_rest_min_last_3']:.1f} min")
+
+    render_footer()
+
+# ==============================================================================
+# ESTADO 3: DEMO MODE (AMOSTRA ANONIMIZADA)
+# ==============================================================================
+elif st.session_state.current_view == "demo":
+    st.markdown(
+        """
+        <div class="rpg-dialog-box">
+            <div class="pixel-title" style="font-size: 1.05rem;">🎮 DEMO MODE (AMOSTRA ANONIMIZADA)</div>
+            <div class="pixel-text">
+                Teste o detector com sessões reais anonimizadas (SHA-256) da nossa base de validação.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    _, col_demo, _ = st.columns([1.5, 3, 1.5])
+    with col_demo:
+        if not df_sample_feat.empty:
+            players_available = df_sample_feat["puuid"].unique().tolist()
+            st.markdown(
+                '<span class="pixel-field-label">👤 Selecione um Invocador (Amostra):</span>',
+                unsafe_allow_html=True,
+            )
+            selected_player = st.selectbox(
+                "Selecione um Invocador",
+                players_available,
+                label_visibility="collapsed",
+            )
+
+            d1, d2 = st.columns(2)
+            if d1.button("🔍 Analisar Amostra", use_container_width=True):
+                df_p = df_sample_raw[df_sample_raw["puuid"] == selected_player].sort_values("game_start_ms")
+                res = analyze_player_session(df_p, artifact)
+                st.session_state.analysis_result = res
+                st.session_state.is_tilted = bool(res and res["prob_loss"] >= threshold)
+                st.rerun()
+
+            if d2.button("⬅️ Voltar ao Início", use_container_width=True):
+                st.session_state.current_view = "home"
+                st.rerun()
+
+    if st.session_state.analysis_result:
+        res = st.session_state.analysis_result
+        feat = res["latest_features"]
+        prob = res["prob_loss"]
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        _, c1, c2, c3, c4, _ = st.columns([1, 2, 2, 2, 2, 1])
+        c1.metric("Risco Previsto", f"{prob:.1%}")
+        c2.metric("Status Mental", "ESTÁVEL ✅")
+        c3.metric("Derrotas (Últimos 3)", f"{int(feat['losses_last_3'])} / 3")
+        c4.metric("Descanso Médio", f"{feat['avg_rest_min_last_3']:.1f} min")
+
+    render_footer()
 
 # ==============================================================================
 # ESTADO 4: ANÁLISES 8-BIT
@@ -656,3 +703,5 @@ elif st.session_state.current_view == "analytics":
         fig_rest.update_layout(yaxis_range=[0, 100])
         fig_rest = style_8bit_chart(fig_rest, "⏱️ IMPACTO DO RE-QUEUE IMPULSIVO")
         st.plotly_chart(fig_rest, use_container_width=True)
+
+    render_footer()

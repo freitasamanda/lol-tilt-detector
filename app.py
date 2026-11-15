@@ -3,13 +3,9 @@ app.py
 ======
 Webapp Interativo 8-Bit: Detector de Tilt no League of Legends.
 
-Navegação:
-- Tela Inicial ('home'): Caixa de boas-vindas centralizada, seletor de invocador
-  com alto contraste e grade 2x2 de botões 8-bit ('Verificar Estado Mental',
-  'Simular Alerta de Tilt', 'Consulta Ao Vivo' e 'Análises 8-Bit').
-- Modo Chill ('is_tilted=True'): Fundo de floresta 8-bit, mensagem acolhedora
-  e som ambiente discreto no canto inferior direito ('assets/forest.wav').
-- Subtelas ('live' e 'analytics'): Acessadas pelos botões 8-bit com botão de retorno.
+Configurado para operação com Personal API Key (via st.secrets ou .env),
+cache de consultas ao vivo (TTL 10 min) para proteção de Rate Limit e
+conformidade visual com os termos de desenvolvedor da Riot Games.
 """
 
 import base64
@@ -51,6 +47,19 @@ def get_base64_file(file_path: str) -> str:
         return base64.b64encode(f.read()).decode()
 
 
+def get_riot_api_key() -> str:
+    """Recupera a Personal API Key dos Secrets do Streamlit Cloud ou do .env local."""
+    try:
+        secret_key = st.secrets.get("RIOT_API_KEY", "")
+        if secret_key:
+            return secret_key
+    except Exception:
+        pass
+
+    env_key = os.getenv("RIOT_API_KEY", "")
+    return "" if "sua-chave" in env_key else env_key
+
+
 def apply_8bit_theme(is_tilted: bool):
     """Aplica o plano de fundo centralizado, botões pixel-art e contraste."""
     bg_file = "assets/forest_8bit.png" if is_tilted else "assets/lol8bit.png"
@@ -85,6 +94,7 @@ def apply_8bit_theme(is_tilted: bool):
 
         .block-container {{
             padding-top: 2.2rem !important;
+            padding-bottom: 3.5rem !important;
         }}
 
         .stApp {{
@@ -144,7 +154,7 @@ def apply_8bit_theme(is_tilted: bool):
             margin-bottom: -14px;
         }}
 
-        /* Estilização do Selectbox e Text Input para combinar com a caixa */
+        /* Estilização do Selectbox e Text Input */
         div[data-baseweb="select"] > div,
         div[data-baseweb="input"] > div {{
             background-color: #111827 !important;
@@ -226,6 +236,20 @@ def apply_8bit_theme(is_tilted: bool):
             width: 190px;
             opacity: 0.85;
         }}
+
+        /* Aviso legal discreto da Riot Games no rodapé */
+        .riot-disclaimer {{
+            max-width: 650px;
+            margin: 35px auto 0 auto;
+            padding: 8px 12px;
+            background-color: rgba(10, 15, 25, 0.78);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            font-family: sans-serif;
+            font-size: 0.72rem;
+            color: #cbd5e1;
+            text-align: center;
+            line-height: 1.35;
+        }}
         </style>
         """,
         unsafe_allow_html=True,
@@ -268,7 +292,7 @@ def style_8bit_chart(fig, title: str):
 
 
 # ==============================================================================
-# CARREGAMENTO DO MODELO E PREDIÇÃO
+# CARREGAMENTO DO MODELO, CACHE DA RIOT API E PREDIÇÃO
 # ==============================================================================
 @st.cache_resource
 def load_or_train_model():
@@ -296,6 +320,32 @@ def load_sample_features():
     engineer = TiltFeatureEngineer()
     df_feat = engineer.build_features(df_raw)
     return df_raw, df_feat
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_live_player_matches(game_name: str, tag_line: str, region: str) -> pd.DataFrame:
+    """
+    Consulta as últimas 8 partidas ranqueadas de um jogador usando a Personal API Key.
+    Cacheado por 10 minutos (ttl=600) para proteger o Rate Limit da chave.
+    """
+    api_key = get_riot_api_key()
+    if not api_key:
+        raise ValueError("Chave da Riot API não configurada no servidor.")
+
+    collector = RiotCollector(api_key=api_key, region=region)
+    puuid = collector.get_puuid_by_riot_id(game_name, tag_line)
+    if not puuid:
+        return pd.DataFrame()
+
+    match_ids = collector.get_ranked_match_ids(puuid, count=8)
+    rows = []
+    for m_id in match_ids:
+        m_data = collector.get_match_details(m_id)
+        if m_data:
+            parsed = collector.parse_match_participants(m_data)
+            rows.extend([r for r in parsed if r["puuid"] == puuid])
+
+    return pd.DataFrame(rows)
 
 
 def analyze_player_session(df_player_raw: pd.DataFrame, artifact: dict):
@@ -333,7 +383,6 @@ if not artifact:
 threshold = artifact["alert_threshold"]
 df_sample_raw, df_sample_feat = load_sample_features()
 
-# Aplica o tema correspondente ao estado atual
 apply_8bit_theme(is_tilted=st.session_state.is_tilted)
 
 # ==============================================================================
@@ -422,7 +471,7 @@ elif st.session_state.current_view == "home":
                 }
                 st.rerun()
 
-        # Linha 2 de botões 8-bit (Navegação para Consulta Ao Vivo e Análises)
+        # Linha 2 de botões 8-bit
         b3, b4 = st.columns(2)
         if b3.button("🔴 Consulta Ao Vivo", use_container_width=True):
             st.session_state.current_view = "live"
@@ -444,8 +493,18 @@ elif st.session_state.current_view == "home":
         c3.metric("Derrotas (Últimos 3)", f"{int(feat['losses_last_3'])} / 3")
         c4.metric("Descanso Médio", f"{feat['avg_rest_min_last_3']:.1f} min")
 
+    st.markdown(
+        """
+        <div class="riot-disclaimer">
+            Detector de Tilts não é endossado pela Riot Games e não reflete as visões ou opiniões da Riot Games
+            ou de qualquer pessoa oficialmente envolvida na produção ou gerenciamento das propriedades da Riot Games.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 # ==============================================================================
-# ESTADO 3: CONSULTA AO VIVO VIA RIOT API
+# ESTADO 3: CONSULTA AO VIVO VIA RIOT API (USANDO PERSONAL API KEY)
 # ==============================================================================
 elif st.session_state.current_view == "live":
     st.markdown(
@@ -453,7 +512,7 @@ elif st.session_state.current_view == "live":
         <div class="rpg-dialog-box">
             <div class="pixel-title" style="font-size: 1.05rem;">🔴 CONSULTA AO VIVO (RIOT API)</div>
             <div class="pixel-text">
-                Informe sua chave de desenvolvimento da Riot e um Riot ID para diagnosticar a sessão atual em tempo real.
+                Digite seu Riot ID (ex: Nick#BR1) para avaliar sua sessão ranqueada recente em tempo real.
             </div>
         </div>
         """,
@@ -462,15 +521,6 @@ elif st.session_state.current_view == "live":
 
     _, col_live, _ = st.columns([1.5, 3, 1.5])
     with col_live:
-        env_key = os.getenv("RIOT_API_KEY", "")
-        st.markdown('<span class="pixel-field-label">🔑 Riot API Key (RGAPI-...):</span>', unsafe_allow_html=True)
-        api_key_input = st.text_input(
-            "Riot API Key",
-            value="" if "sua-chave" in env_key else env_key,
-            type="password",
-            label_visibility="collapsed",
-        )
-
         c_reg, c_id = st.columns([1, 2])
         with c_reg:
             st.markdown('<span class="pixel-field-label">🌎 Região:</span>', unsafe_allow_html=True)
@@ -480,37 +530,33 @@ elif st.session_state.current_view == "live":
                 label_visibility="collapsed",
             )
         with c_id:
-            st.markdown('<span class="pixel-field-label">🎮 Riot ID (ex: Nick#BR1):</span>', unsafe_allow_html=True)
+            st.markdown('<span class="pixel-field-label">🎮 Riot ID (Nick#TAG):</span>', unsafe_allow_html=True)
             riot_id_query = st.text_input(
                 "Riot ID",
+                placeholder="Ex: Nick#BR1",
                 label_visibility="collapsed",
             )
 
         btn_l1, btn_l2 = st.columns(2)
         if btn_l1.button("🔍 Analisar Agora", use_container_width=True):
-            if not api_key_input or "#" not in riot_id_query:
-                st.warning("⚠️ Preencha uma chave válida e o Riot ID no formato Nome#TAG.")
+            if "#" not in riot_id_query:
+                st.warning("⚠️ Formato inválido! Use 'Nome#TAG'.")
             else:
                 game_name, tag_line = [p.strip() for p in riot_id_query.split("#", 1)]
-                with st.spinner("Consultando histórico na Riot API..."):
+                with st.spinner(f"Consultando partidas recentes de {game_name}#{tag_line}..."):
                     try:
-                        collector = RiotCollector(api_key=api_key_input, region=region_input)
-                        puuid = collector.get_puuid_by_riot_id(game_name, tag_line)
-                        if not puuid:
-                            st.error("❌ Invocador não encontrado.")
+                        df_live = fetch_live_player_matches(game_name, tag_line, region_input)
+                        if df_live.empty:
+                            st.error("❌ Invocador não encontrado ou sem partidas ranqueadas recentes.")
+                        elif len(df_live) < 4:
+                            st.info("ℹ️ Invocador possui menos de 4 partidas ranqueadas recentes para análise de sessão.")
                         else:
-                            match_ids = collector.get_ranked_match_ids(puuid, count=15)
-                            rows = []
-                            for m_id in match_ids:
-                                m_data = collector.get_match_details(m_id)
-                                if m_data:
-                                    parsed = collector.parse_match_participants(m_data)
-                                    rows.extend([r for r in parsed if r["puuid"] == puuid])
-
-                            df_live = pd.DataFrame(rows)
-                            res = analyze_player_session(df_live, artifact) if len(df_live) >= 4 else None
+                            res = analyze_player_session(df_live, artifact)
                             if not res:
-                                st.info("ℹ️ O jogador não possui uma sessão contínua de pelo menos 4 partidas recentes.")
+                                st.info(
+                                    "ℹ️ Nenhuma sessão contínua de pelo menos 4 partidas "
+                                    "com menos de 15 min de intervalo foi encontrada (sem sinal de tilt agudo)."
+                                )
                             else:
                                 st.session_state.analysis_result = res
                                 st.session_state.is_tilted = bool(res["prob_loss"] >= threshold)
